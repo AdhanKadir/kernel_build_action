@@ -268,6 +268,18 @@ if [ "$INPUT_KHACK" == "true" ]; then
         if [ -f "$CONFIG_FILE" ]; then
             echo "::debug::Stack protector settings in $CONFIG_FILE"
             grep -E 'STACKPROTECTOR' "$CONFIG_FILE" || true
+
+            if [ -x scripts/config ]; then
+                echo "Enforcing global stack protector configuration"
+                scripts/config --file "$CONFIG_FILE" \
+                    --disable CONFIG_STACKPROTECTOR_PER_TASK \
+                    --enable CONFIG_STACKPROTECTOR \
+                    --enable CONFIG_STACKPROTECTOR_STRONG || true
+                echo "::debug::Stack protector settings after enforcement"
+                grep -E 'STACKPROTECTOR' "$CONFIG_FILE" || true
+            else
+                echo "Warning: scripts/config not executable; skipping stack protector enforcement"
+            fi
         fi
     fi
 
