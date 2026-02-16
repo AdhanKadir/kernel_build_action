@@ -224,8 +224,10 @@ def analyze_errors(log_file: str) -> int:
     """
     log_path = Path(log_file)
     if not log_path.exists():
-        print(f"Error: Log file '{log_file}' does not exist.")
-        sys.exit(1)
+        print(f"::warning:: Log file '{log_file}' does not exist.")
+        print("Skipping error analysis because no build output was recorded. "
+              "Ensure the kernel build step progressed far enough to generate a log.")
+        return 0
 
     print(f"Analyzing log file: {log_file}")
     print_separator()
