@@ -35,14 +35,14 @@ jobs:
       - name: Build
         uses: dabao1955/kernel_build_action@main
         with:
-          kernel-url: https://github.com/AcmeUI-Devices/android_kernel_xiaomi_cas
-          kernel-branch: taffy
-          config: cas_defconfig
+          kernel-url: https://android.googlesource.com/kernel/common
+          kernel-branch: android14-6.1.115_r00
+          config: gki_defconfig
           arch: arm64
-          aosp-gcc: true
           aosp-clang: true
-          android-version: 12
-          aosp-clang-version: r383902
+          ndk-version: 26.1.10909125
+          android-version: 14
+          khack: true
 ```
 Or use the [preset workflow file](https://github.com/dabao1955/kernel_build_action/blob/main/.github/workflows/build.yml) to modify it.
 
@@ -79,14 +79,18 @@ Or use the [preset workflow file](https://github.com/dabao1955/kernel_build_acti
 | nethunter-patch | false | Apply patch for Kali NetHunter support | false |
 | kvm | false | Enable [KVM (Kernel Virtual Machine)](https://linux-kvm.org/page/Main_Page) support | false |
 | bbg | false | Enable [BaseBandGuard](https://github.com/vc-teahouse/Baseband-guard) support | false |
+| khack | false | Download and integrate the Kernel Driver Hack driver | false |
+| khack-url | false | Custom repository URL for the Kernel Driver Hack driver | https://github.com/AdhanKadir/Kernel_driver_hack_dev.git |
+| khack-branch | false | Branch or tag to checkout from the driver repository | main |
+| khack-config | false | Value for `CONFIG_KERNEL_HACK` (y/m) | y |
 | ccache | false | Enable ccache (clang only) to speed up kernel compilation | false |
-| aosp-gcc | false | Use AOSP GCC toolchain to compile the kernel (Enable when using AOSP clang toolchain) | false |
+| aosp-gcc | false | Use legacy AOSP GCC 4.9 toolchains (when not relying on NDK) | false |
 | other-gcc32-url | false | URL of custom GCC arm32 toolchain (Supports .xz, .zip, .tar and .git formats) | https://github.com/username/gcc |
 | other-gcc32-branch | false | Branch name of GCC arm32 toolchain | main |
 | other-gcc64-url | false | URL of custom GCC arm64 toolchain (Supports .xz, .zip, .tar and .git formats) | https://github.com/username/gcc |
 | other-gcc64-branch | false | Branch name of GCC arm64 toolchain | main |
-| aosp-clang | false | Use AOSP clang toolchain to compile the kernel | false |
-| aosp-clang-version | false | AOSP clang version. [See all AOSP clang versions](https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+/mirror-goog-main-llvm-toolchain-source/README.md). (default = r383902) | r383902 |
+| aosp-clang | false | Install Android NDK via sdkmanager and build with its LLVM toolchain | false |
+| ndk-version | false | Android NDK version installed by sdkmanager when using `aosp-clang` | 26.1.10909125 |
 | other-clang-url | false | URL of custom clang toolchain (Supports .xz, .zip, .tar and .git formats) | https://github.com/username/clang |
 | other-clang-branch | false | Branch name of clang toolchain | main |
 | anykernel3 | false | Use AnyKernel3 to package the compiled kernel. (if false, must provide bootimg-url) | false |
@@ -100,8 +104,14 @@ Or use the [preset workflow file](https://github.com/dabao1955/kernel_build_acti
 > [!CAUTION]
 > Please Read this first if you have some questions!
 
+### Toolchain provisioning
+When `aosp-clang` is enabled, the action automatically installs Android command-line tools and downloads the requested Android NDK (default `26.1.10909125`, i.e. r26.1) via `sdkmanager`. The embedded LLVM toolchain (clang/lld/binutils) from the NDK is used for both 64-bit and 32-bit targets, so enabling `aosp-gcc` is no longer necessary in this configuration.
+
+### Kernel Driver Hack integration
+Setting `khack: true` makes the workflow clone [Kernel_driver_hack_dev](https://github.com/AdhanKadir/Kernel_driver_hack_dev), copy its `kernel/` sources into `drivers/khack`, and automatically add the required `drivers/Makefile`/`drivers/Kconfig` entries. The selected `khack-config` value (default `y`) is appended to your kernel config so the driver is built into the image. You can override the repo or branch with `khack-url`/`khack-branch` if you maintain your own fork.
+
 ### How to use 3rd clang？
-You should disable aosp-clang and android-ndk options to use it.
+You should disable the `aosp-clang` option (and optionally configure `other-clang-*` inputs) to use it.
 
 ### Why KernelSU version built with this action is still v0.9.5？
 See [KernelSU 's release note](https://github.com/tiann/KernelSU/releases/tag/v1.0.0) for more details.

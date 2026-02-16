@@ -34,6 +34,10 @@ inputs:
     description: 'Android version for AOSP toolchain selection'
     required: false
     default: ''
+  ndk-version:
+    description: 'Android NDK version installed via sdkmanager when using AOSP Clang'
+    required: false
+    default: '26.1.10909125'
   vendor:
     description: 'Enable vendor kernel source code integration'
     required: false
@@ -129,6 +133,21 @@ inputs:
     description: 'Enable BaseBandGuard support'
     required: false
     default: 'false'
+  khack:
+    description: 'Integrate Kernel Driver Hack (khack) driver into the kernel'
+    required: false
+    default: 'false'
+  khack-url:
+    description: 'Repository URL containing the khack driver sources'
+    required: false
+  khack-branch:
+    description: 'Branch or tag of the khack driver repository'
+    required: false
+    default: main
+  khack-config:
+    description: 'Value to set for CONFIG_KERNEL_HACK (y/m)'
+    required: false
+    default: y
   disable-lto:
     description: 'Disable Link Time Optimization (LTO)'
     required: false
@@ -193,6 +212,10 @@ runs:
             local dir_path=$1
             local dir_name=$2
 
+            if [ ! -d "$dir_path" ]; then
+                return
+            fi
+
             if [ ! -d "$dir_path/bin" ]; then
                 echo "Normalizing $dir_name directory structure..."
                 for nested_dir in "$dir_path"/*/*; do
@@ -226,6 +249,43 @@ runs:
             esac
         }
 
+        install_android_sdk() {
+            local sdk_root="$HOME/android-sdk"
+            local cmdline_tools_zip="commandlinetools-linux-11076708_latest.zip"
+            local cmdline_tools_url="https://dl.google.com/android/repository/${cmdline_tools_zip}"
+
+            mkdir -p "$sdk_root/cmdline-tools"
+            if [ ! -d "$sdk_root/cmdline-tools/latest" ]; then
+                echo "Downloading Android command line tools"
+                aria2c -o "$cmdline_tools_zip" "$cmdline_tools_url"
+                unzip -q "$cmdline_tools_zip" -d "$sdk_root/cmdline-tools"
+                rm -f "$cmdline_tools_zip"
+                mv "$sdk_root/cmdline-tools/cmdline-tools" "$sdk_root/cmdline-tools/latest"
+                chmod +x "$sdk_root/cmdline-tools/latest/bin"/*
+            fi
+
+            export ANDROID_SDK_ROOT="$sdk_root"
+            export SDKMANAGER_BIN="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
+            export PATH="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$PATH"
+        }
+
+        install_ndk() {
+            local ndk_version="$1"
+            local sdk_root="$HOME/android-sdk"
+
+            install_android_sdk
+
+            yes | "$SDKMANAGER_BIN" --sdk_root="$sdk_root" --licenses >/dev/null
+            yes | "$SDKMANAGER_BIN" --sdk_root="$sdk_root" "ndk;$ndk_version"
+
+            NDK_HOME="$sdk_root/ndk/$ndk_version"
+            if [ ! -d "$NDK_HOME" ]; then
+                error "Failed to install Android NDK $ndk_version"
+            fi
+
+            export NDK_HOME
+        }
+
         if [[ ${GITHUB_ACTIONS} != "true" || ${OSTYPE} != "linux-gnu" || ( ! -f /bin/apt && ! -f /bin/pacman ) ]]; then
             error "This action requires GitHub Actions Linux runners (Debian-based or ArchLinux-based). Current: OSTYPE=${OSTYPE}, GITHUB_ACTIONS=${GITHUB_ACTIONS}"
         fi
@@ -243,17 +303,15 @@ runs:
         echo "::endgroup::"
 
         if [ "${{ inputs.aosp-clang }}" == "true" ]; then
-            echo "::group::Downloading AOSP Clang"
-            if [ "${{ inputs.aosp-gcc }}" != "true" ]; then
-                error "AOSP GCC is required when using AOSP Clang."
+            echo "::group::Installing Android NDK toolchain via sdkmanager"
+            install_ndk "${{ inputs.ndk-version }}"
+            NDK_LLVM_ROOT="$NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64"
+            NDK_LLVM_BIN="$NDK_LLVM_ROOT/bin"
+            if [ ! -d "$NDK_LLVM_BIN" ]; then
+                error "Android NDK LLVM toolchain not found at $NDK_LLVM_BIN"
             fi
-            AOSP_CLANG_URL="https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/"
-            if [ -n "${{ inputs.android-version }}" ]; then
-                AOSP_CLANG_URL+="android${{ inputs.android-version }}-release/clang-${{ inputs.aosp-clang-version }}.tar.gz"
-            else
-                AOSP_CLANG_URL+="mirror-goog-main-llvm-toolchain-source/clang-${{ inputs.aosp-clang-version }}.tar.gz"
-            fi
-            download_and_extract "$AOSP_CLANG_URL" "aosp-clang" "$HOME/clang"
+            rm -rf "$HOME/clang"
+            ln -s "$NDK_LLVM_ROOT" "$HOME/clang"
             echo "::endgroup::"
         elif [ -n "${{ inputs.other-clang-url }}" ]; then
             echo "::group::Downloading Third-party Clang"
@@ -272,7 +330,7 @@ runs:
             fi
         fi
 
-        if [ "${{ inputs.aosp-gcc }}" == "true" ] || [ -n "${NEED_GCC:-}" ]; then
+        if { [ "${{ inputs.aosp-gcc }}" == "true" ] && [ "${{ inputs.aosp-clang }}" != "true" ]; } || [ -n "${NEED_GCC:-}" ]; then
             echo "::group::Downloading AOSP GCC"
             if [ -n "${{ inputs.android-version }}" ]; then
                 AOSP_GCC64_URL="https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/aarch64/aarch64-linux-android-4.9"
@@ -351,6 +409,49 @@ runs:
         fi
 
         CONFIG_FILE="arch/${{ inputs.arch }}/configs/${{ inputs.config }}"
+
+        if [ "${{ inputs.khack }}" == "true" ]; then
+            echo "::group::Integrating Kernel Driver Hack"
+            KHACK_URL="${{ inputs.khack-url }}"
+            if [ -z "$KHACK_URL" ]; then
+                KHACK_URL="https://github.com/AdhanKadir/Kernel_driver_hack_dev.git"
+            fi
+            KHACK_BRANCH="${{ inputs.khack-branch }}"
+            KHACK_DIR="$HOME/kernel_driver_hack"
+            rm -rf "$KHACK_DIR"
+            git clone --depth="${{ inputs.depth }}" -b "$KHACK_BRANCH" "$KHACK_URL" "$KHACK_DIR"
+
+            if [ ! -d "$KHACK_DIR/kernel" ]; then
+                error "Kernel driver hack repository is missing the kernel directory"
+            fi
+
+            mkdir -p drivers
+            rm -rf drivers/khack
+            cp -r "$KHACK_DIR/kernel" drivers/khack
+
+            DRIVER_MAKEFILE="drivers/Makefile"
+            DRIVER_KCONFIG="drivers/Kconfig"
+
+            if ! grep -q "khack" "$DRIVER_MAKEFILE" 2>/dev/null; then
+                printf "\nobj-\$(CONFIG_KERNEL_HACK) += khack/\n" >> "$DRIVER_MAKEFILE"
+            fi
+
+            if ! grep -q "drivers/khack/Kconfig" "$DRIVER_KCONFIG" 2>/dev/null; then
+                printf "\nsource \"drivers/khack/Kconfig\"\n" >> "$DRIVER_KCONFIG"
+            fi
+
+            if [ -f "$CONFIG_FILE" ]; then
+                if grep -q "^CONFIG_KERNEL_HACK=" "$CONFIG_FILE"; then
+                    sed -i "s/^CONFIG_KERNEL_HACK=.*/CONFIG_KERNEL_HACK=${{ inputs.khack-config }}/" "$CONFIG_FILE"
+                else
+                    echo "CONFIG_KERNEL_HACK=${{ inputs.khack-config }}" >> "$CONFIG_FILE"
+                fi
+            else
+                echo "Warning: CONFIG_FILE $CONFIG_FILE not found; skipping config update"
+            fi
+            echo "::endgroup::"
+        fi
+
         if [ "${{ inputs.ksu }}" == "true" ]; then
             echo "::group::Initializing KernelSU"
             if [ -f KernelSU/kernel/Kconfig ]; then
@@ -490,7 +591,10 @@ runs:
         if [[ -d "$HOME/clang/bin" ]]; then
             CMD_PATH="$HOME/clang/bin"
             CMD_CC="clang"
-            if [[ -d "$HOME/gcc-64/bin" ]] || [[ -d "$HOME/gcc-32/bin" ]]; then
+            if [[ -n "${NDK_HOME:-}" ]]; then
+                CMD_CROSS_COMPILE="aarch64-linux-android-"
+                CMD_CROSS_COMPILE_ARM32="arm-linux-androideabi-"
+            elif [[ -d "$HOME/gcc-64/bin" ]] || [[ -d "$HOME/gcc-32/bin" ]]; then
                 CMD_CROSS_COMPILE="$HOME/gcc-64/bin/${GCC64}-"
                 CMD_CROSS_COMPILE_ARM32="$HOME/gcc-32/bin/${GCC32}-"
             fi
@@ -528,7 +632,11 @@ runs:
         if [[ "${{ inputs.arch }}" == "arm" ]]; then
             CMD_CLANG_TRIPLE="${CMD_CROSS_COMPILE_ARM32}"
         else
-            CMD_CLANG_TRIPLE="aarch64-linux-gnu-"
+            if [[ -n "${NDK_HOME:-}" ]]; then
+                CMD_CLANG_TRIPLE="aarch64-linux-android-"
+            else
+                CMD_CLANG_TRIPLE="aarch64-linux-gnu-"
+            fi
         fi
 
         export PATH="$CMD_PATH:$PATH"
