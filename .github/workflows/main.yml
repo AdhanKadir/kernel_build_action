@@ -39,5 +39,5 @@ jobs:
           ksu-version: main
           android-version: 14
           khack: true
-          disable-lto: true
+          disable-lto: false
           anykernel3: true
