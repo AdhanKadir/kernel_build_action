@@ -122,10 +122,15 @@ if [ "$INPUT_AOSP_CLANG" == "true" ]; then
         ln -sf "$NDK_LLVM_BIN/ld.lld" "$NDK_LLVM_BIN/aarch64-linux-android-ld"
         ln -sf "$NDK_LLVM_BIN/ld.lld" "$NDK_LLVM_BIN/arm-linux-androideabi-ld"
     fi
-    if [ -x "$NDK_LLVM_BIN/llvm-nm" ]; then
-        ln -sf "$NDK_LLVM_BIN/llvm-nm" "$NDK_LLVM_BIN/aarch64-linux-android-nm"
-        ln -sf "$NDK_LLVM_BIN/llvm-nm" "$NDK_LLVM_BIN/arm-linux-androideabi-nm"
-    fi
+
+    LLVM_TOOLCHAINS=(nm objcopy objdump readelf strip size ranlib addr2line ar)
+    for tool in "${LLVM_TOOLCHAINS[@]}"; do
+        llvm_tool="$NDK_LLVM_BIN/llvm-$tool"
+        if [ -x "$llvm_tool" ]; then
+            ln -sf "$llvm_tool" "$NDK_LLVM_BIN/aarch64-linux-android-$tool"
+            ln -sf "$llvm_tool" "$NDK_LLVM_BIN/arm-linux-androideabi-$tool"
+        fi
+    done
     rm -rf "$HOME/clang"
     ln -s "$NDK_LLVM_ROOT" "$HOME/clang"
     echo "::endgroup::"
