@@ -212,6 +212,7 @@ VERSION=$(grep -E '^VERSION = ' Makefile | awk '{print $3}')
 PATCHLEVEL=$(grep -E '^PATCHLEVEL = ' Makefile | awk '{print $3}')
 SUBLEVEL=$(grep -E '^SUBLEVEL = ' Makefile | awk '{print $3}')
 
+NONGKI=false
 if [ "$VERSION" -lt 5 ] 2>/dev/null || { [ "$VERSION" -eq 5 ] 2>/dev/null && [ "$PATCHLEVEL" -lt 10 ] 2>/dev/null; }; then
     NONGKI=true
 fi
