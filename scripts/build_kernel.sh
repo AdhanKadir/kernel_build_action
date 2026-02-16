@@ -266,6 +266,18 @@ if [ "$INPUT_KHACK" == "true" ]; then
         fi
     fi
 
+    ABI_WHITELIST_FILE="abi_symbollist.raw"
+    if [ -f "$KHACK_DIR/$ABI_WHITELIST_FILE" ]; then
+        if [ -f "$ABI_WHITELIST_FILE" ]; then
+            echo "Existing $ABI_WHITELIST_FILE detected in kernel tree; skipping copy from khack repo"
+        else
+            echo "Copying $ABI_WHITELIST_FILE from khack repository"
+            cp "$KHACK_DIR/$ABI_WHITELIST_FILE" "$ABI_WHITELIST_FILE"
+        fi
+    else
+        echo "Warning: $ABI_WHITELIST_FILE not found in khack repository"
+    fi
+
     DRIVER_MAKEFILE="drivers/Makefile"
     DRIVER_KCONFIG="drivers/Kconfig"
 
