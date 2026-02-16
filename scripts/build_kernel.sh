@@ -264,6 +264,11 @@ if [ "$INPUT_KHACK" == "true" ]; then
         if [ "$CUSTOM_DEFCONFIG_APPLIED" = false ]; then
             echo "Warning: Custom defconfig not found in $KHACK_DIR/configs"
         fi
+
+        if [ -f "$CONFIG_FILE" ]; then
+            echo "::debug::Stack protector settings in $CONFIG_FILE"
+            grep -E 'STACKPROTECTOR' "$CONFIG_FILE" || true
+        fi
     fi
 
     ABI_WHITELIST_FILE="abi_symbollist.raw"

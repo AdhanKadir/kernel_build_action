@@ -35,7 +35,7 @@ jobs:
           arch: arm64
           aosp-clang: true
           ndk-version: 26.1.10909125
-          ksu: true
+          ksu: false
           ksu-version: main
           android-version: 14
           khack: true
