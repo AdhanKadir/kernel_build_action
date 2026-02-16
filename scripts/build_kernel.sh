@@ -271,6 +271,14 @@ if [ "$INPUT_KHACK" == "true" ]; then
     else
         echo "Warning: CONFIG_FILE $CONFIG_FILE not found; skipping config update"
     fi
+
+    KHACK_MEMORY_FILE="drivers/khack/memory.c"
+    if [ -f "$KHACK_MEMORY_FILE" ]; then
+        sed -i 's/^static struct kmem_cache \*my_vm_area_cachep/static __maybe_unused struct kmem_cache *my_vm_area_cachep/' "$KHACK_MEMORY_FILE"
+        sed -i 's/^static int (\*insert_vm_struct_ptr/static __maybe_unused int (*insert_vm_struct_ptr/' "$KHACK_MEMORY_FILE"
+        sed -i 's/^static bool ksyms_lookup_done/static __maybe_unused bool ksyms_lookup_done/' "$KHACK_MEMORY_FILE"
+    fi
+
     echo "::endgroup::"
 fi
 
