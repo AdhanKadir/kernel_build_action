@@ -81,8 +81,10 @@ install_ndk() {
 
     install_android_sdk
 
+    set +o pipefail
     yes | "$SDKMANAGER_BIN" --sdk_root="$sdk_root" --licenses >/dev/null
     yes | "$SDKMANAGER_BIN" --sdk_root="$sdk_root" "ndk;$ndk_version"
+    set -o pipefail
 
     NDK_HOME="$sdk_root/ndk/$ndk_version"
     if [ ! -d "$NDK_HOME" ]; then
