@@ -118,6 +118,10 @@ if [ "$INPUT_AOSP_CLANG" == "true" ]; then
     if [ ! -d "$NDK_LLVM_BIN" ]; then
         error "Android NDK LLVM toolchain not found at $NDK_LLVM_BIN"
     fi
+    if [ -x "$NDK_LLVM_BIN/ld.lld" ]; then
+        ln -sf "$NDK_LLVM_BIN/ld.lld" "$NDK_LLVM_BIN/aarch64-linux-android-ld"
+        ln -sf "$NDK_LLVM_BIN/ld.lld" "$NDK_LLVM_BIN/arm-linux-androideabi-ld"
+    fi
     rm -rf "$HOME/clang"
     ln -s "$NDK_LLVM_ROOT" "$HOME/clang"
     echo "::endgroup::"
