@@ -458,6 +458,7 @@ make \
     CROSS_COMPILE="$CMD_CROSS_COMPILE" \
     CROSS_COMPILE_ARM32="$CMD_CROSS_COMPILE_ARM32" \
     CLANG_TRIPLE="$CMD_CLANG_TRIPLE" \
+    KBUILD_DTB_WERROR=0 \
    "${make_args[@]}" | tee -a out/build.log
 
 echo "::endgroup::"
