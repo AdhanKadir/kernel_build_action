@@ -258,6 +258,11 @@ if [ "$INPUT_KHACK" == "true" ]; then
         printf "\nobj-\$(CONFIG_KERNEL_HACK) += khack/\n" >> "$DRIVER_MAKEFILE"
     fi
 
+    KHACK_WARNING_FLAG="subdir-ccflags-\\$(CONFIG_KERNEL_HACK) += -Wno-unused-variable"
+    if ! grep -Fq "$KHACK_WARNING_FLAG" "$DRIVER_MAKEFILE" 2>/dev/null; then
+        printf "%s\n" "$KHACK_WARNING_FLAG" >> "$DRIVER_MAKEFILE"
+    fi
+
     if ! grep -q "drivers/khack/Kconfig" "$DRIVER_KCONFIG" 2>/dev/null; then
         printf "\nsource \"drivers/khack/Kconfig\"\n" >> "$DRIVER_KCONFIG"
     fi
