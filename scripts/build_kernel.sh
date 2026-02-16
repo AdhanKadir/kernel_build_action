@@ -515,6 +515,11 @@ make \
     KBUILD_DTB_WERROR=0 \
    "${make_args[@]}" | tee -a out/build.log
 
+if [ -f out/.config ]; then
+    echo "::debug::Stack protector settings in out/.config"
+    grep -E 'STACKPROTECTOR' out/.config || true
+fi
+
 echo "::endgroup::"
 
 if [ "$INPUT_ANYKERNEL3" == "false" ]; then
