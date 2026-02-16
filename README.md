@@ -33,7 +33,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - name: Build
-        uses: dabao1955/kernel_build_action@main
+        uses: AdhanKadir/kernel_build_action@main
         with:
           kernel-url: https://android.googlesource.com/kernel/common
           kernel-branch: android14-6.1.115_r00
