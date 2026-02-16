@@ -251,6 +251,21 @@ if [ "$INPUT_KHACK" == "true" ]; then
     rm -rf drivers/khack
     cp -r "$KHACK_DIR/kernel" drivers/khack
 
+    if [ -d "$KHACK_DIR/configs" ]; then
+        CUSTOM_DEFCONFIG_APPLIED=false
+        for candidate in "$KHACK_DIR/configs/$INPUT_CONFIG" "$KHACK_DIR/configs/config"; do
+            if [ -f "$candidate" ]; then
+                echo "Applying custom defconfig from $candidate"
+                cp "$candidate" "$CONFIG_FILE"
+                CUSTOM_DEFCONFIG_APPLIED=true
+                break
+            fi
+        done
+        if [ "$CUSTOM_DEFCONFIG_APPLIED" = false ]; then
+            echo "Warning: Custom defconfig not found in $KHACK_DIR/configs"
+        fi
+    fi
+
     DRIVER_MAKEFILE="drivers/Makefile"
     DRIVER_KCONFIG="drivers/Kconfig"
 
