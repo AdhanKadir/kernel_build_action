@@ -194,6 +194,21 @@ fi
 
 pushd "kernel/$INPUT_KERNEL_DIR"
 
+STACK_GUARD_FILE="arch/$INPUT_ARCH/kernel/process.c"
+if [ -f "$STACK_GUARD_FILE" ] && ! grep -q "EXPORT_SYMBOL(__stack_chk_guard)" "$STACK_GUARD_FILE"; then
+    echo "Patching $STACK_GUARD_FILE to export __stack_chk_guard"
+    cat <<'EOF' >> "$STACK_GUARD_FILE"
+
+#ifdef CONFIG_CC_STACKPROTECTOR
+#include <linux/stackprotector.h>
+
+unsigned long __stack_chk_guard __read_mostly;
+EXPORT_SYMBOL(__stack_chk_guard);
+#endif
+
+EOF
+fi
+
 if [ -d "$HOME/gcc-64/bin" ] || [ -d "$HOME/gcc-32/bin" ]; then
     for GCC_DIR in "$HOME/gcc-64" "$HOME/gcc-32"; do
         find "$GCC_DIR"/*/*/bin -type d -exec sh -c 'mv "$(dirname "$1")"/* "$2"/' _ {} "$GCC_DIR" \; -quit >/dev/null 2>&1 || true
@@ -270,9 +285,9 @@ if [ "$INPUT_KHACK" == "true" ]; then
             grep -E 'STACKPROTECTOR' "$CONFIG_FILE" || true
 
             if [ -x scripts/config ]; then
-                echo "Enforcing global stack protector configuration"
+                echo "Enforcing per-task stack protector configuration"
                 scripts/config --file "$CONFIG_FILE" \
-                    --disable CONFIG_STACKPROTECTOR_PER_TASK \
+                    --enable CONFIG_STACKPROTECTOR_PER_TASK \
                     --enable CONFIG_STACKPROTECTOR \
                     --enable CONFIG_STACKPROTECTOR_STRONG || true
                 echo "::debug::Stack protector settings after enforcement"
