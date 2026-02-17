@@ -197,16 +197,31 @@ pushd "kernel/$INPUT_KERNEL_DIR"
 STACK_GUARD_FILE="arch/$INPUT_ARCH/kernel/process.c"
 if [ -f "$STACK_GUARD_FILE" ] && ! grep -q "EXPORT_SYMBOL(__stack_chk_guard)" "$STACK_GUARD_FILE"; then
     echo "Patching $STACK_GUARD_FILE to export __stack_chk_guard"
-    cat <<'EOF' >> "$STACK_GUARD_FILE"
-
-#ifdef CONFIG_CC_STACKPROTECTOR
+    python3 - "$STACK_GUARD_FILE" <<'PY'
+from pathlib import Path
+import sys
+path = Path(sys.argv[1])
+text = path.read_text()
+snippet = """#ifdef CONFIG_CC_STACKPROTECTOR
 #include <linux/stackprotector.h>
 
 unsigned long __stack_chk_guard __read_mostly;
 EXPORT_SYMBOL(__stack_chk_guard);
 #endif
-
-EOF
+"""
+if "EXPORT_SYMBOL(__stack_chk_guard)" in text:
+    sys.exit(0)
+lines = text.splitlines()
+insert_idx = 0
+for i, line in enumerate(lines):
+    if line.strip() == "" and i > 0 and lines[i-1].startswith("#include"):
+        insert_idx = i
+        break
+else:
+    insert_idx = 0
+lines.insert(insert_idx, snippet.rstrip())
+path.write_text("\n".join(lines) + "\n")
+PY
 fi
 
 if [ -d "$HOME/gcc-64/bin" ] || [ -d "$HOME/gcc-32/bin" ]; then
